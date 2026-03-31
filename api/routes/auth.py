@@ -1,61 +1,61 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
-from core.config import CLIENT_ID, REDIRECT_URI, GITHUB_AUTH_URL
+from pydantic import BaseModel
+from core.config import GITHUB_CLIENT_ID, GITHUB_AUTHORIZE_URL, REDIRECT_URI
 from services.github_auth_service import (
     exchange_code_for_token,
     get_github_user,
     user_tokens,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/auth/github", tags=["Auth"])
 
 
-@router.get("/auth/github/login")
-def github_login():
+class UserResponse(BaseModel):
+    id: int
+    login: str
+    name: str | None
+    public_repos: int
+
+
+class AuthResponse(BaseModel):
+    message: str
+    user_id: int
+
+
+@router.get("/login")
+async def github_login():
     url = (
-        f"{GITHUB_AUTH_URL}"
-        f"?client_id={CLIENT_ID}"
+        f"{GITHUB_AUTHORIZE_URL}"
+        f"?client_id={GITHUB_CLIENT_ID}"
         f"&redirect_uri={REDIRECT_URI}"
-        f"&scope=repo"
     )
     return RedirectResponse(url)
 
 
-
-
-
-@router.get("/auth/github/callback")
+@router.get("/callback", response_model=AuthResponse)
 async def github_callback(code: str):
     token = await exchange_code_for_token(code)
+    user = await get_github_user(token)
+
+    user_id = user["id"]
+    user_tokens[user_id] = token
+
+    return AuthResponse(message="Connected successfully", user_id=user_id)
+
+
+@router.get("/me/{user_id}", response_model=UserResponse)
+async def get_me(user_id: int):
+    token = user_tokens.get(user_id)
 
     if not token:
-        raise HTTPException(status_code=400, detail="Token exchange failed")
+        raise HTTPException(status_code=404, detail="User not found")
 
-    user_data = await get_github_user(token)
-    github_id = user_data.get("id")
+    user = await get_github_user(token)
 
-    user_tokens[github_id] = token
-
-    return RedirectResponse(
-        url=f"/success?user_id={github_id}"
+    return UserResponse(
+        id=user["id"],
+        login=user["login"],
+        name=user.get("name"),
+        public_repos=user["public_repos"]
     )
-
-
-@router.get("/auth/github/me")
-async def get_me(github_user_id: int):
-    token = user_tokens.get(github_user_id)
-
-    if not token:
-        raise HTTPException(status_code=404, detail="User not connected")
-
-    user_data = await get_github_user(token)
-
-    return user_data
-
-
-@router.get("/success")
-def success(user_id: int):
-    return {
-        "message": "GitHub connected successfully",
-        "github_user_id": user_id
-    }
