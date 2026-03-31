@@ -34,7 +34,7 @@ pip install -r requirements.txt
 ### 2. Configure Environment Variables
 Create a `.env` file in the root directory and add your GitHub OAuth client ID and secret:
 ```env
-GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_ID=client_id
 GITHUB_CLIENT_SECRET=client_secret
 ```
 
