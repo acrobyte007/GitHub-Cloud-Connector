@@ -141,5 +141,5 @@ async def get_commits(user_id: int, owner: str, repo: str):
             date=c["commit"]["author"]["date"],
             url=c["html_url"]
         )
-        for c in commits[:10]
+        for c in commits
     ]
